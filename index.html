@@ -232,10 +232,10 @@ function calculateAndRender() {
     let left_edge_d2 = 2 * C_arr[0];
     let right_edge_d2 = 2 * C_arr[n-1] + 6 * d[n] * h[n];
     
-    html += `На левом краю ($x_0 = ${fmt(x[0])}$):<br>`;
+    html += `На левом краю (\\( x_0 = ${fmt(x[0])} \\)):<br>`;
     html += `\\( S''_{1}(x_0 +) = 2 \\cdot c_1 = 2 \\cdot ${wrapNeg(C_arr[0])} = \\mathbf{${fmt(Math.abs(left_edge_d2) < 0.0001 ? 0 : left_edge_d2)}} \\)<br><br>`;
     
-    html += `На правом краю ($x_n = ${fmt(x[n])}$):<br>`;
+    html += `На правом краю (\\( x_n = ${fmt(x[n])} \\)):<br>`;
     html += `\\( S''_{${n}}(x_n -) = 2 \\cdot c_{${n}} + 6 \\cdot d_{${n}} \\cdot h_{${n}} = 2 \\cdot ${wrapNeg(C_arr[n-1])} + 6 \\cdot ${wrapNeg(d[n])} \\cdot ${fmt(h[n])} = \\mathbf{${fmt(Math.abs(right_edge_d2) < 0.0001 ? 0 : right_edge_d2)}} \\)<br>`;
 
     // Отрисовка
