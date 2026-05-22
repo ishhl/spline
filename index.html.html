@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кубический сплайн</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f9f9f9; }
+        .container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        label { font-weight: bold; }
+        input { width: 100%; padding: 10px; margin: 10px 0 20px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #218838; }
+        pre { background: #222; color: #0f0; padding: 15px; border-radius: 5px; white-space: pre-wrap; overflow-x: auto; font-family: monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Расчет кубического сплайна</h2>
+    
+    <label>Введите значения X через пробел:</label>
+    <input type="text" id="x_vals" value="2 3 4 6">
+    
+    <label>Введите значения Y через пробел:</label>
+    <input type="text" id="y_vals" value="3 -1 2 1">
+    
+    <button onclick="calculate()">Вычислить</button>
+    
+    <div id="result" style="display:none; margin-top: 20px;">
+        <label>Результат:</label>
+        <pre id="output"></pre>
+    </div>
+</div>
+
+<script>
+// Этот JavaScript-код - точная копия нашей логики на Pascal
+function calculate() {
+    let xStr = document.getElementById('x_vals').value.trim().split(/\s+/);
+    let yStr = document.getElementById('y_vals').value.trim().split(/\s+/);
+    
+    let x = xStr.map(Number);
+    let y = yStr.map(Number);
+    let n = x.length - 1;
+    let output = "";
+
+    if (x.length !== y.length || n < 1) {
+        alert("Ошибка: количество X и Y должно совпадать и быть больше 1!");
+        return;
+    }
+
+    let h = [], alpha = [], beta = [], a = [], b = [], c = [], d = [];
+    
+    for (let i = 1; i <= n; i++) h[i] = x[i] - x[i-1];
+
+    alpha[0] = 0; beta[0] = 0;
+
+    for (let i = 1; i <= n - 1; i++) {
+        let A = h[i];
+        let C = 2 * (h[i] + h[i+1]);
+        let B = h[i+1];
+        let F = 3 * ((y[i+1] - y[i]) / h[i+1] - (y[i] - y[i-1]) / h[i]);
+
+        alpha[i] = -B / (A * alpha[i-1] + C);
+        beta[i] = (F - A * beta[i-1]) / (A * alpha[i-1] + C);
+    }
+
+    c[n] = 0;
+    for (let i = n - 1; i >= 1; i--) {
+        c[i] = alpha[i] * c[i+1] + beta[i];
+    }
+    c[0] = 0;
+
+    for (let i = 1; i <= n; i++) {
+        a[i] = y[i-1];
+        d[i] = (c[i] - c[i-1]) / (3 * h[i]);
+        b[i] = (y[i] - y[i-1]) / h[i] - (h[i] / 3) * (2 * c[i-1] + c[i]);
+    }
+
+    // Формируем вывод результатов
+    for (let i = 1; i <= n; i++) {
+        output += `Участок ${i} (от X=${x[i-1]} до X=${x[i]}):\n`;
+        output += `a = ${a[i].toFixed(4)}\n`;
+        output += `b = ${b[i].toFixed(4)}\n`;
+        output += `c = ${c[i-1].toFixed(4)}\n`;
+        output += `d = ${d[i].toFixed(4)}\n`;
+        
+        let S = `S(x) = ${a[i].toFixed(4)}`;
+        let b_val = b[i] >= 0 ? ` + ${b[i].toFixed(4)}` : ` - ${Math.abs(b[i]).toFixed(4)}`;
+        let c_val = c[i-1] >= 0 ? ` + ${c[i-1].toFixed(4)}` : ` - ${Math.abs(c[i-1]).toFixed(4)}`;
+        let d_val = d[i] >= 0 ? ` + ${d[i].toFixed(4)}` : ` - ${Math.abs(d[i]).toFixed(4)}`;
+        
+        output += `${S}${b_val} * (x - ${x[i-1]})${c_val} * (x - ${x[i-1]})^2${d_val} * (x - ${x[i-1]})^3\n`;
+        output += `--------------------------------------------------\n`;
+    }
+
+    document.getElementById('result').style.display = 'block';
+    document.getElementById('output').textContent = output;
+}
+</script>
+
+</body>
+</html>
