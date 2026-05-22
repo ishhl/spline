@@ -128,7 +128,7 @@ function calculateAndRender() {
     }
 
     // Следовательно С
-    html += `Следовательно ($c_i = C_{i-1}$):<br><div class="math-block">$$ \\begin{aligned} `;
+    html += `Следовательно (\\( c_i = C_{i-1} \\)):<br><div class="math-block">$$ \\begin{aligned} `;
     for(let i=1; i<=n; i++) html += `c_${i} &= ${fmt(C_arr[i-1])} \\\\ `;
     html += `\\end{aligned} $$</div>`;
 
