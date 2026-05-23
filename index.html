@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Расчет кубического сплайна</title>
-    <!-- Подключаем библиотеку для рисования красивых формул -->
+    <!-- MathJax (формулы) -->
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <!-- Chart.js (графики) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; background-color: #f4f6f9; color: #333; line-height: 1.6; }
         .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -18,7 +21,8 @@
         input { padding: 12px; border: 1px solid #ccd; border-radius: 5px; font-size: 16px; }
         button { padding: 15px; background: #008800; color: white; border: none; border-radius: 5px; font-size: 18px; cursor: pointer; transition: 0.3s; }
         button:hover { background: #006600; }
-        #report { display: none; background: #fffaf0; padding: 20px; border-radius: 8px; border: 1px solid #e2d9c3; margin-top: 20px; overflow-x: auto; }
+        #chart-container { display: none; margin-top: 30px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ccc; }
+        #report { display: none; background: #fffaf0; padding: 20px; border-radius: 8px; border: 1px solid #e2d9c3; overflow-x: auto; }
         table { border-collapse: collapse; width: 100%; margin: 15px 0; background: white; }
         th, td { border: 1px solid #bbb; text-align: center; padding: 10px; }
         th { background: #e9ecef; }
@@ -40,14 +44,21 @@
         <button onclick="calculateAndRender()">Сгенерировать решение</button>
     </div>
     
-    <!-- Сюда будет выводиться наше красивое решение -->
+    <!-- Отчет теперь идет ПЕРЕД графиком -->
     <div id="report"></div>
+
+    <!-- Контейнер для Графика теперь ВНИЗУ -->
+    <div id="chart-container">
+        <canvas id="splineChart"></canvas>
+    </div>
 </div>
 
 <script>
-// Вспомогательные функции для форматирования чисел (до 2 знаков после запятой, как у тебя)
+// Вспомогательные функции
 function fmt(num) { return (Math.round(num * 100) / 100).toString().replace('.', ','); }
 function wrapNeg(num) { return num < 0 ? `(${fmt(num)})` : fmt(num); }
+
+let chartInstance = null;
 
 function calculateAndRender() {
     let xStr = document.getElementById('x_vals').value.trim().split(/\s+/);
@@ -61,7 +72,6 @@ function calculateAndRender() {
         return;
     }
 
-    // Математические расчеты
     let h = [], alpha = [], beta = [], a = [], b = [], c = [], d = [], C_arr = [];
     for (let i = 1; i <= n; i++) h[i] = x[i] - x[i-1];
 
@@ -85,10 +95,11 @@ function calculateAndRender() {
         b[i] = (y[i] - y[i-1]) / h[i] - (h[i] / 3) * (2 * C_arr[i-1] + C_arr[i]);
     }
 
-    // --- ФОРМИРОВАНИЕ HTML ОТЧЕТА ---
+    // ==========================================
+    // ФОРМИРОВАНИЕ HTML ОТЧЕТА 
+    // ==========================================
     let html = `<h3>Нахождение кубического сплайна:</h3>`;
     
-    // Блок ДАНО
     html += `<b>Дано:</b>`;
     let table = `<table><tr><td><b>X</b></td>`;
     for(let val of x) table += `<td>${fmt(val)}</td>`;
@@ -155,12 +166,9 @@ function calculateAndRender() {
     }
     html += `\\end{aligned} $$</div>`;
 
-    // ==========================================
-    // НОВЫЙ БЛОК: ПРОВЕРКА СОВПАДЕНИЙ ТРЕБОВАНИЙ
-    // ==========================================
+    // ПРОВЕРКИ
     html += `<h3 style="margin-top: 40px; color: #2c3e50; border-bottom: 2px solid #ccc;">Проверка совпадений требований:</h3>`;
     
-    // Блок 1: Совпадение в узлах
     html += `<b>1) Требуем совпадения в узлах значений функции и значений сплайна:</b>`;
     html += `<div class="math-block">$$ \\begin{aligned} S_i(x_{i-1}) &= y_{i-1} \\\\ S_i(x_i) &= y_i \\\\ i &= 1, n \\end{aligned} $$</div>`;
     
@@ -178,7 +186,6 @@ function calculateAndRender() {
         html += `<div class="math-block">$$ S_${i}(${fmt(x[i])}) = ${a_str} ${b_str} \\cdot (${fmt(x[i])} - ${wrapNeg(x[i-1])}) ${c_str} \\cdot (${fmt(x[i])} - ${wrapNeg(x[i-1])})^2 ${d_str} \\cdot (${fmt(x[i])} - ${wrapNeg(x[i-1])})^3 = ${fmt(val2)} $$</div>`;
     }
 
-    // Таблица проверки
     let checkTable = `<table><tr><td><b>X</b></td>`;
     for(let i=0; i<=n; i++) checkTable += `<td>${fmt(x[i])}</td>`;
     checkTable += `</tr><tr><td><b>Y</b></td>`;
@@ -202,7 +209,6 @@ function calculateAndRender() {
     checkTable += `</table>`;
     html += checkTable;
 
-    // Блок 2: Производные
     html += `<b>2) Требуем непрерывности функции первой и второй производной во всех внутренних точках, включая узловые:</b>`;
     html += `<div class="math-block">$$ \\begin{aligned} S'_i(x_i -) &= S'_{i+1}(x_i +) \\\\ S''_i(x_i -) &= S''_{i+1}(x_i +) \\\\ i &= 1, n-1 \\end{aligned} $$</div>`;
     
@@ -225,7 +231,6 @@ function calculateAndRender() {
         }
     }
 
-    // Блок 3: Нулевая кривизна (края)
     html += `<b>3) Требуем равенства второй производной нулю в местах нулевой кривизны:</b>`;
     html += `<div class="math-block">$$ \\begin{aligned} S''(x_0 +) &= 0 \\\\ S''(x_n -) &= 0 \\end{aligned} $$</div>`;
 
@@ -238,12 +243,71 @@ function calculateAndRender() {
     html += `На правом краю (\\( x_n = ${fmt(x[n])} \\)):<br>`;
     html += `\\( S''_{${n}}(x_n -) = 2 \\cdot c_{${n}} + 6 \\cdot d_{${n}} \\cdot h_{${n}} = 2 \\cdot ${wrapNeg(C_arr[n-1])} + 6 \\cdot ${wrapNeg(d[n])} \\cdot ${fmt(h[n])} = \\mathbf{${fmt(Math.abs(right_edge_d2) < 0.0001 ? 0 : right_edge_d2)}} \\)<br>`;
 
-    // Отрисовка
     let reportDiv = document.getElementById('report');
     reportDiv.innerHTML = html;
     reportDiv.style.display = 'block';
     
     MathJax.typesetPromise();
+
+    // ==========================================
+    // ПОСТРОЕНИЕ ГРАФИКА (CHART.JS)
+    // ==========================================
+    let splinePoints = [];
+    for (let i = 1; i <= n; i++) {
+        let steps = 50; 
+        let stepSize = h[i] / steps;
+        for (let j = 0; j <= steps; j++) {
+            let cx = x[i-1] + j * stepSize;
+            let diff = cx - x[i-1];
+            let cy = a[i] + b[i]*diff + C_arr[i-1]*diff*diff + d[i]*diff*diff*diff;
+            splinePoints.push({x: cx, y: cy});
+        }
+    }
+
+    let scatterPoints = [];
+    for(let i=0; i<=n; i++) {
+        scatterPoints.push({x: x[i], y: y[i]});
+    }
+
+    document.getElementById('chart-container').style.display = 'block';
+    
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    
+    let ctx = document.getElementById('splineChart').getContext('2d');
+    chartInstance = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Сплайн (S(x))',
+                data: splinePoints,
+                borderColor: '#0066ff',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                showLine: true,
+                pointRadius: 0,
+                tension: 0
+            }, {
+                label: 'Исходные узлы',
+                data: scatterPoints,
+                backgroundColor: '#ff0000',
+                borderColor: '#ff0000',
+                pointRadius: 6,
+                showLine: false
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { title: { display: true, text: 'Ось X', font: {size: 14, weight: 'bold'} } },
+                y: { title: { display: true, text: 'Ось Y', font: {size: 14, weight: 'bold'} } }
+            },
+            plugins: {
+                legend: { position: 'top' }
+            }
+        }
+    });
 }
 </script>
 
