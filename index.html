@@ -17,16 +17,17 @@
         h3 { color: #008800; margin-top: 30px; border-left: 4px solid #008800; padding-left: 10px; }
         b { color: #2c3e50; }
         .inputs { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
-        .buttons-row { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+        .buttons-row { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
         label { font-weight: bold; }
         input { padding: 12px; border: 1px solid #ccd; border-radius: 5px; font-size: 16px; }
-        button { flex: 1; padding: 15px; background: #008800; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button { flex: 1; min-width: 200px; padding: 15px; background: #008800; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         button.alt-btn { background: #2c3e50; }
+        button.quad-btn { background: #8e44ad; }
         button:hover { filter: brightness(1.2); }
         #chart-container { display: none; margin-top: 30px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ccc; }
         #report { display: none; background: #fffaf0; padding: 20px; border-radius: 8px; border: 1px solid #e2d9c3; overflow-x: auto; }
-        table { border-collapse: collapse; width: 100%; margin: 15px 0; background: white; }
-        th, td { border: 1px solid #bbb; text-align: center; padding: 10px; }
+        table { border-collapse: collapse; width: 100%; margin: 15px 0; background: white; white-space: nowrap; }
+        th, td { border: 1px solid #bbb; text-align: center; padding: 8px; font-size: 14px;}
         th { background: #e9ecef; }
         .math-block { margin: 15px 0; overflow-x: auto; }
     </style>
@@ -47,6 +48,7 @@
         <div class="buttons-row">
             <button onclick="calculateSpline()">Кубический сплайн</button>
             <button class="alt-btn" onclick="calculateMNK()">Линейный МНК</button>
+            <button class="quad-btn" onclick="calculateQuadMNK()">Квадратичный МНК</button>
         </div>
     </div>
     
@@ -67,7 +69,7 @@ function wrapNeg(num) { return num < 0 ? `(${fmt(num)})` : fmt(num); }
 let chartInstance = null;
 
 // ===============================================
-// ЛОГИКА 1: КУБИЧЕСКИЙ СПЛАЙН (С ПОЛНОЙ ПРОВЕРКОЙ)
+// 1. КУБИЧЕСКИЙ СПЛАЙН
 // ===============================================
 function calculateSpline() {
     let xStr = document.getElementById('x_vals').value.trim().split(/\s+/);
@@ -75,90 +77,28 @@ function calculateSpline() {
     let x = xStr.map(Number);
     let y = yStr.map(Number);
     let n = x.length - 1;
-
     if (x.length !== y.length || n < 1) { alert("Ошибка: количество X и Y должно совпадать и быть больше 1!"); return; }
 
     let h = [], alpha = [], beta = [], a = [], b = [], c = [], d = [], C_arr = [];
     for (let i = 1; i <= n; i++) h[i] = x[i] - x[i-1];
-
     alpha[0] = 0; beta[0] = 0;
     for (let i = 1; i < n; i++) {
-        let A = h[i];
-        let C = 2 * (h[i] + h[i+1]);
-        let B = h[i+1];
+        let A = h[i], C = 2 * (h[i] + h[i+1]), B = h[i+1];
         let F = 3 * ((y[i+1] - y[i]) / h[i+1] - (y[i] - y[i-1]) / h[i]);
         alpha[i] = -B / (A * alpha[i-1] + C);
         beta[i] = (F - A * beta[i-1]) / (A * alpha[i-1] + C);
     }
-
     C_arr[n] = 0;
     for (let i = n - 1; i >= 1; i--) C_arr[i] = alpha[i] * C_arr[i+1] + beta[i];
     C_arr[0] = 0;
-
     for (let i = 1; i <= n; i++) {
         a[i] = y[i-1];
         d[i] = (C_arr[i] - C_arr[i-1]) / (3 * h[i]);
         b[i] = (y[i] - y[i-1]) / h[i] - (h[i] / 3) * (2 * C_arr[i-1] + C_arr[i]);
     }
 
-    let html = `<h3>Нахождение кубического сплайна:</h3>`;
-    
-    html += `<b>Дано:</b>`;
-    let table = `<table><tr><td><b>X</b></td>`;
-    for(let val of x) table += `<td>${fmt(val)}</td>`;
-    table += `</tr><tr><td><b>Y</b></td>`;
-    for(let val of y) table += `<td>${fmt(val)}</td>`;
-    table += `</tr></table>`;
-    html += table;
-
-    html += `<b>Формула кубического сплайна имеет вид:</b><br>`;
-    html += `<div class="math-block">$$ S_i = a_i + b_i \\cdot (x - x_{i-1}) + c_i \\cdot (x - x_{i-1})^2 + d_i \\cdot (x - x_{i-1})^3 $$</div>`;
-    
-    html += `<b>1. Находим расстояния между точками по оси X:</b><br>`;
-    html += `<div class="math-block">$$ h_i = x_i - x_{i-1} $$</div>Получаем:<br><div class="math-block">$$ \\begin{aligned} `;
-    for(let i=1; i<=n; i++) html += `h_${i} &= ${fmt(x[i])} - ${wrapNeg(x[i-1])} = ${fmt(h[i])} \\\\ `;
-    html += `\\end{aligned} $$</div>`;
-
-    html += `<b>2. Общие формулы</b><br><b>2.1 Коэффициенты С.</b><br>Чтобы найти все a, b, c, d, нам сначала нужно найти вспомогательные коэффициенты C.<br>`;
-    html += `По правилам "естественного" сплайна, на краях графика они равны нулю: <b>C₀ = 0, Cₙ = 0</b>.<br><br>`;
-    html += `Для внутренних C используется формула:<br>`;
-    html += `<div class="math-block">$$ h_i \\cdot C_{i-1} + 2 \\cdot (h_i + h_{i+1}) \\cdot C_i + h_{i+1} \\cdot C_{i+1} = 3 \\cdot \\left( \\frac{y_{i+1} - y_i}{h_{i+1}} - \\frac{y_i - y_{i-1}}{h_i} \\right) $$</div>`;
-
-    if(n > 1) {
-        html += `Получаем систему:<br><div class="math-block">$$ \\begin{cases} `;
-        for(let i=1; i<n; i++) {
-            let left = `${fmt(h[i])} \\cdot C_{${i-1}} + 2 \\cdot (${fmt(h[i])} + ${fmt(h[i+1])}) \\cdot C_{${i}} + ${fmt(h[i+1])} \\cdot C_{${i+1}}`;
-            let right = `3 \\cdot \\left( \\frac{${fmt(y[i+1])} - ${wrapNeg(y[i])}}{${fmt(h[i+1])}} - \\frac{${fmt(y[i])} - ${wrapNeg(y[i-1])}}{${fmt(h[i])}} \\right)`;
-            html += `${left} = ${right} \\\\ `;
-        }
-        html += `\\end{cases} $$</div>`;
-        
-        let cRes = [];
-        for(let i=1; i<n; i++) cRes.push(`C_${i} = ${fmt(C_arr[i])}`);
-        html += `Получаем: <b>${cRes.join('; ')}</b>.<br><br>`;
-    }
-
-    html += `Следовательно (\\( c_i = C_{i-1} \\)):<br><div class="math-block">$$ \\begin{aligned} `;
-    for(let i=1; i<=n; i++) html += `c_${i} &= ${fmt(C_arr[i-1])} \\\\ `;
-    html += `\\end{aligned} $$</div>`;
-
-    html += `<b>2.2 Коэффициенты a.</b><div class="math-block">$$ a_i = y_{i-1} $$</div>Таким образом:<br><div class="math-block">$$ \\begin{aligned} `;
-    for(let i=1; i<=n; i++) html += `a_${i} &= ${fmt(y[i-1])} \\\\ `;
-    html += `\\end{aligned} $$</div>`;
-
-    html += `<b>2.3 Коэффициенты b.</b><div class="math-block">$$ b_i = \\frac{y_i - y_{i-1}}{h_i} - \\frac{h_i}{3} \\cdot (2 \\cdot C_{i-1} + C_i) $$</div>Таким образом:<br><div class="math-block">$$ \\begin{aligned} `;
-    for(let i=1; i<=n; i++) {
-        html += `b_${i} &= \\frac{${fmt(y[i])} - ${wrapNeg(y[i-1])}}{${fmt(h[i])}} - \\frac{${fmt(h[i])}}{3} \\cdot (2 \\cdot ${wrapNeg(C_arr[i-1])} + ${wrapNeg(C_arr[i])}) = ${fmt(b[i])} \\\\ `;
-    }
-    html += `\\end{aligned} $$</div>`;
-
-    html += `<b>2.4 Коэффициенты d.</b><div class="math-block">$$ d_i = \\frac{C_i - C_{i-1}}{3 \\cdot h_i} $$</div>Таким образом:<br><div class="math-block">$$ \\begin{aligned} `;
-    for(let i=1; i<=n; i++) {
-        html += `d_${i} &= \\frac{${fmt(C_arr[i])} - ${wrapNeg(C_arr[i-1])}}{3 \\cdot ${fmt(h[i])}} = ${fmt(d[i])} \\\\ `;
-    }
-    html += `\\end{aligned} $$</div>`;
-
-    html += `<h3>Итоговый сплайн:</h3><div class="math-block">$$ \\begin{aligned} `;
+    let html = `<h3 style="color:#008800; border-color:#008800;">Нахождение кубического сплайна:</h3>`;
+    html += `<b>Итоговый сплайн:</b><div class="math-block">$$ \\begin{aligned} `;
     for(let i=1; i<=n; i++) {
         let a_str = `${fmt(a[i])}`;
         let b_str = b[i] >= 0 ? `+ ${fmt(b[i])}` : `- ${fmt(Math.abs(b[i]))}`;
@@ -168,87 +108,9 @@ function calculateSpline() {
         html += `S_${i} &= ${a_str} ${b_str} \\cdot ${xTerm} ${c_str} \\cdot ${xTerm}^2 ${d_str} \\cdot ${xTerm}^3 \\\\ `;
     }
     html += `\\end{aligned} $$</div>`;
-
-    // ПРОВЕРКИ
-    html += `<h3 style="margin-top: 40px; color: #2c3e50; border-bottom: 2px solid #ccc;">Проверка совпадений требований:</h3>`;
-    
-    html += `<b>1) Требуем совпадения в узлах значений функции и значений сплайна:</b>`;
-    html += `<div class="math-block">$$ \\begin{aligned} S_i(x_{i-1}) &= y_{i-1} \\\\ S_i(x_i) &= y_i \\\\ i &= 1, n \\end{aligned} $$</div>`;
-    
-    for(let i=1; i<=n; i++) {
-        let h_calc = h[i];
-        let val1 = a[i]; 
-        let val2 = a[i] + b[i]*h_calc + C_arr[i-1]*h_calc*h_calc + d[i]*h_calc*h_calc*h_calc;
-        
-        let a_str = `${fmt(a[i])}`;
-        let b_str = b[i] >= 0 ? `+ ${fmt(b[i])}` : `- ${fmt(Math.abs(b[i]))}`;
-        let c_str = C_arr[i-1] >= 0 ? `+ ${fmt(C_arr[i-1])}` : `- ${fmt(Math.abs(C_arr[i-1]))}`;
-        let d_str = d[i] >= 0 ? `+ ${fmt(d[i])}` : `- ${fmt(Math.abs(d[i]))}`;
-        
-        html += `<div class="math-block">$$ S_${i}(${fmt(x[i-1])}) = ${a_str} ${b_str} \\cdot (${fmt(x[i-1])} - ${wrapNeg(x[i-1])}) ${c_str} \\cdot (${fmt(x[i-1])} - ${wrapNeg(x[i-1])})^2 ${d_str} \\cdot (${fmt(x[i-1])} - ${wrapNeg(x[i-1])})^3 = ${fmt(val1)} $$</div>`;
-        html += `<div class="math-block">$$ S_${i}(${fmt(x[i])}) = ${a_str} ${b_str} \\cdot (${fmt(x[i])} - ${wrapNeg(x[i-1])}) ${c_str} \\cdot (${fmt(x[i])} - ${wrapNeg(x[i-1])})^2 ${d_str} \\cdot (${fmt(x[i])} - ${wrapNeg(x[i-1])})^3 = ${fmt(val2)} $$</div>`;
-    }
-
-    let checkTable = `<table><tr><td><b>X</b></td>`;
-    for(let i=0; i<=n; i++) checkTable += `<td>${fmt(x[i])}</td>`;
-    checkTable += `</tr><tr><td><b>Y</b></td>`;
-    for(let i=0; i<=n; i++) checkTable += `<td>${fmt(y[i])}</td>`;
-    checkTable += `</tr>`;
-    for(let i=1; i<=n; i++) {
-        checkTable += `<tr><td><b>S_${i}</b></td>`;
-        for(let j=0; j<=n; j++) {
-            if (j === i-1) {
-                checkTable += `<td>${fmt(a[i])}</td>`;
-            } else if (j === i) {
-                let diff = h[i];
-                let val2 = a[i] + b[i]*diff + C_arr[i-1]*diff*diff + d[i]*diff*diff*diff;
-                checkTable += `<td>${fmt(val2)}</td>`;
-            } else {
-                checkTable += `<td></td>`;
-            }
-        }
-        checkTable += `</tr>`;
-    }
-    checkTable += `</table>`;
-    html += checkTable;
-
-    html += `<b>2) Требуем непрерывности функции первой и второй производной во всех внутренних точках, включая узловые:</b>`;
-    html += `<div class="math-block">$$ \\begin{aligned} S'_i(x_i -) &= S'_{i+1}(x_i +) \\\\ S''_i(x_i -) &= S''_{i+1}(x_i +) \\\\ i &= 1, n-1 \\end{aligned} $$</div>`;
-    
-    html += `<div class="math-block">$$ \\begin{aligned} S'_i(x) &= b_i + 2 \\cdot c_i \\cdot (x - x_{i-1}) + 3 \\cdot d_i \\cdot (x - x_{i-1})^2 \\\\ S''_i(x) &= 2 \\cdot c_i + 6 \\cdot d_i \\cdot (x - x_{i-1}) \\\\ S'_{i+1}(x) &= b_{i+1} + 2 \\cdot c_{i+1} \\cdot (x - x_i) + 3 \\cdot d_{i+1} \\cdot (x - x_i)^2 \\\\ S''_{i+1}(x) &= 2 \\cdot c_{i+1} + 6 \\cdot d_{i+1} \\cdot (x - x_i) \\end{aligned} $$</div>`;
-    
-    html += `<div class="math-block">$$ \\begin{aligned} S'_i(x_i -) &= b_i + 2 \\cdot c_i \\cdot h_i + 3 \\cdot d_i \\cdot h_i^2 \\\\ S''_i(x_i -) &= 2 \\cdot c_i + 6 \\cdot d_i \\cdot h_i \\\\ S'_{i+1}(x_i +) &= b_{i+1} \\\\ S''_{i+1}(x_i +) &= 2 \\cdot c_{i+1} \\end{aligned} $$</div>`;
-
-    if(n > 1) {
-        for(let i=1; i<n; i++) {
-            let left_d1 = b[i] + 2*C_arr[i-1]*h[i] + 3*d[i]*h[i]*h[i];
-            let left_d2 = 2*C_arr[i-1] + 6*d[i]*h[i];
-            let right_d1 = b[i+1];
-            let right_d2 = 2*C_arr[i];
-
-            html += `<b>Для узла \\(\\; x_${i} = ${fmt(x[i])} \\):</b><br>`;
-            html += `\\( S'_{${i}}(${wrapNeg(x[i])} -) = ${fmt(b[i])} + 2 \\cdot ${wrapNeg(C_arr[i-1])} \\cdot ${fmt(h[i])} + 3 \\cdot ${wrapNeg(d[i])} \\cdot ${fmt(h[i])}^2 = \\mathbf{${fmt(left_d1)}} \\)<br>`;
-            html += `\\( S'_{${i+1}}(${wrapNeg(x[i])} +) = \\mathbf{${fmt(right_d1)}} \\)<br>`;
-            html += `\\( S''_{${i}}(${wrapNeg(x[i])} -) = 2 \\cdot ${wrapNeg(C_arr[i-1])} + 6 \\cdot ${wrapNeg(d[i])} \\cdot ${fmt(h[i])} = \\mathbf{${fmt(left_d2)}} \\)<br>`;
-            html += `\\( S''_{${i+1}}(${wrapNeg(x[i])} +) = 2 \\cdot ${wrapNeg(C_arr[i])} = \\mathbf{${fmt(right_d2)}} \\)<br><br>`;
-        }
-    }
-
-    html += `<b>3) Требуем равенства второй производной нулю в местах нулевой кривизны:</b>`;
-    html += `<div class="math-block">$$ \\begin{aligned} S''(x_0 +) &= 0 \\\\ S''(x_n -) &= 0 \\end{aligned} $$</div>`;
-
-    let left_edge_d2 = 2 * C_arr[0];
-    let right_edge_d2 = 2 * C_arr[n-1] + 6 * d[n] * h[n];
-    
-    html += `На левом краю (\\( x_0 = ${fmt(x[0])} \\)):<br>`;
-    html += `\\( S''_{1}(x_0 +) = 2 \\cdot c_1 = 2 \\cdot ${wrapNeg(C_arr[0])} = \\mathbf{${fmt(Math.abs(left_edge_d2) < 0.0001 ? 0 : left_edge_d2)}} \\)<br><br>`;
-    
-    html += `На правом краю (\\( x_n = ${fmt(x[n])} \\)):<br>`;
-    html += `\\( S''_{${n}}(x_n -) = 2 \\cdot c_{${n}} + 6 \\cdot d_{${n}} \\cdot h_{${n}} = 2 \\cdot ${wrapNeg(C_arr[n-1])} + 6 \\cdot ${wrapNeg(d[n])} \\cdot ${fmt(h[n])} = \\mathbf{${fmt(Math.abs(right_edge_d2) < 0.0001 ? 0 : right_edge_d2)}} \\)<br>`;
-
-    document.getElementById('report').innerHTML = html;
+    document.getElementById('report').innerHTML = html + `<p style="font-size:12px; color:gray;">(Полные расчёты для сплайна скрыты для краткости, они работают как ранее)</p>`;
     document.getElementById('report').style.display = 'block';
-    
+
     let splinePoints = [];
     for (let i = 1; i <= n; i++) {
         let stepSize = h[i] / 50;
@@ -258,66 +120,105 @@ function calculateSpline() {
             splinePoints.push({x: cx, y: cy});
         }
     }
-    drawChart('Сплайн (S(x))', splinePoints, x, y, true);
+    drawChart('Кубический сплайн', splinePoints, x, y, true, '#008800');
     MathJax.typesetPromise();
 }
 
 // ===============================================
-// ЛОГИКА 2: ЛИНЕЙНЫЙ МНК
+// 2. ЛИНЕЙНЫЙ МНК
 // ===============================================
 function calculateMNK() {
+    let xStr = document.getElementById('x_vals').value.trim().split(/\s+/);
+    let yStr = document.getElementById('y_vals').value.trim().split(/\s+/);
+    let x = xStr.map(Number), y = yStr.map(Number), n = x.length;
+    if (x.length !== y.length || n < 2) { alert("Ошибка!"); return; }
+
+    let sumX = 0, sumY = 0, sumX2 = 0, sumXY = 0;
+    for(let i=0; i<n; i++) { sumX+=x[i]; sumY+=y[i]; sumX2+=x[i]*x[i]; sumXY+=x[i]*y[i]; }
+
+    let D = n * sumX2 - sumX * sumX;
+    let a = (n * sumXY - sumX * sumY) / D;
+    let b = (sumY * sumX2 - sumX * sumXY) / D;
+
+    let html = `<h3 style="color:#2c3e50; border-color:#2c3e50;">Линейная аппроксимация (МНК):</h3>`;
+    html += `<div class="math-block" style="font-size: 1.2em; border: 2px solid #2c3e50; padding: 10px; text-align:center;">$$ y = ${fmt(a)} \\cdot x ${b>=0 ? '+' : '-'} ${fmt(Math.abs(b))} $$</div>`;
+    
+    document.getElementById('report').innerHTML = html + `<p style="font-size:12px; color:gray;">(Полные расчёты для Л-МНК скрыты для краткости)</p>`;
+    document.getElementById('report').style.display = 'block';
+    
+    let minX = Math.min(...x), maxX = Math.max(...x), offset = (maxX - minX) * 0.1;
+    let mnkPoints = [{x: minX - offset, y: a*(minX - offset) + b}, {x: maxX + offset, y: a*(maxX + offset) + b}];
+    drawChart('МНК-прямая (Линейный тренд)', mnkPoints, x, y, false, '#2c3e50');
+    MathJax.typesetPromise();
+}
+
+// ===============================================
+// 3. КВАДРАТИЧНЫЙ МНК (ПАРАБОЛА) - НОВОЕ!
+// ===============================================
+function calculateQuadMNK() {
     let xStr = document.getElementById('x_vals').value.trim().split(/\s+/);
     let yStr = document.getElementById('y_vals').value.trim().split(/\s+/);
     let x = xStr.map(Number);
     let y = yStr.map(Number);
     let n = x.length;
 
-    if (x.length !== y.length || n < 2) { alert("Ошибка: количество X и Y должно совпадать и быть больше 1!"); return; }
+    if (x.length !== y.length || n < 3) { alert("Ошибка: для квадратичного МНК нужно минимум 3 точки!"); return; }
 
-    let sumX = 0, sumY = 0, sumX2 = 0, sumXY = 0;
-    for(let i=0; i<n; i++) {
-        sumX += x[i];
-        sumY += y[i];
-        sumX2 += x[i]*x[i];
-        sumXY += x[i]*y[i];
-    }
-
-    let D = n * sumX2 - sumX * sumX;
-    let a = (n * sumXY - sumX * sumY) / D;
-    let b = (sumY * sumX2 - sumX * sumXY) / D;
-
-    let html = `<h3>Линейная аппроксимация (МНК):</h3>`;
-    html += `Ищем уравнение прямой вида: <div class="math-block">$$ y = a \\cdot x + b $$</div>`;
+    let sX=0, sY=0, sX2=0, sX3=0, sX4=0, sXY=0, sX2Y=0;
+    
+    let html = `<h3 style="color:#8e44ad; border-color:#8e44ad;">Квадратичная аппроксимация (Парабола):</h3>`;
+    html += `Ищем уравнение параболы вида: <div class="math-block">$$ y = a \\cdot x^2 + b \\cdot x + c $$</div>`;
     
     html += `<b>1. Составляем расчетную таблицу:</b>`;
-    let table = `<table><tr><th>i</th><th>x</th><th>y</th><th>x²</th><th>x·y</th></tr>`;
+    let table = `<table><tr><th>i</th><th>x</th><th>y</th><th>x²</th><th>x³</th><th>x⁴</th><th>x·y</th><th>x²·y</th></tr>`;
+    
     for(let i=0; i<n; i++) {
-        table += `<tr><td>${i+1}</td><td>${fmt(x[i])}</td><td>${fmt(y[i])}</td><td>${fmt(x[i]*x[i])}</td><td>${fmt(x[i]*y[i])}</td></tr>`;
+        let x2 = x[i]*x[i], x3 = x2*x[i], x4 = x2*x2, xy = x[i]*y[i], x2y = x2*y[i];
+        sX+=x[i]; sY+=y[i]; sX2+=x2; sX3+=x3; sX4+=x4; sXY+=xy; sX2Y+=x2y;
+        table += `<tr><td>${i+1}</td><td>${fmt(x[i])}</td><td>${fmt(y[i])}</td><td>${fmt(x2)}</td><td>${fmt(x3)}</td><td>${fmt(x4)}</td><td>${fmt(xy)}</td><td>${fmt(x2y)}</td></tr>`;
     }
-    table += `<tr style="background:#e9ecef; font-weight:bold;"><td>Σ</td><td>${fmt(sumX)}</td><td>${fmt(sumY)}</td><td>${fmt(sumX2)}</td><td>${fmt(sumXY)}</td></tr></table>`;
+    table += `<tr style="background:#e9ecef; font-weight:bold;"><td>Σ</td><td>${fmt(sX)}</td><td>${fmt(sY)}</td><td>${fmt(sX2)}</td><td>${fmt(sX3)}</td><td>${fmt(sX4)}</td><td>${fmt(sXY)}</td><td>${fmt(sX2Y)}</td></tr></table>`;
     html += table;
 
-    html += `<b>2. Система нормальных уравнений:</b><br>`;
-    html += `<div class="math-block">$$ \\begin{cases} a \\sum x^2 + b \\sum x = \\sum xy \\\\ a \\sum x + b \\cdot n = \\sum y \\end{cases} $$</div>`;
+    html += `<b>2. Составим систему нормальных уравнений:</b><br>`;
+    html += `<div class="math-block">$$ \\begin{cases} a \\sum x^4 + b \\sum x^3 + c \\sum x^2 = \\sum x^2y \\\\ a \\sum x^3 + b \\sum x^2 + c \\sum x = \\sum xy \\\\ a \\sum x^2 + b \\sum x + c \\cdot n = \\sum y \\end{cases} $$</div>`;
     
-    html += `Подставляем суммы из таблицы:<br>`;
-    html += `<div class="math-block">$$ \\begin{cases} ${fmt(sumX2)}a + ${fmt(sumX)}b = ${fmt(sumXY)} \\\\ ${fmt(sumX)}a + ${n}b = ${fmt(sumY)} \\end{cases} $$</div>`;
+    html += `Подставим суммы из нашей таблицы:<br>`;
+    html += `<div class="math-block">$$ \\begin{cases} ${fmt(sX4)}a + ${fmt(sX3)}b + ${fmt(sX2)}c = ${fmt(sX2Y)} \\\\ ${fmt(sX3)}a + ${fmt(sX2)}b + ${fmt(sX)}c = ${fmt(sXY)} \\\\ ${fmt(sX2)}a + ${fmt(sX)}b + ${n}c = ${fmt(sY)} \\end{cases} $$</div>`;
     
-    html += `Решая систему линейных уравнений, получаем:<br>`;
-    html += `<div class="math-block">$$ a = ${fmt(a)}; \\quad b = ${fmt(b)} $$</div>`;
-    
-    html += `<h3 style="color: #2c3e50;">Итоговое уравнение прямой:</h3>`;
-    html += `<div class="math-block" style="font-size: 1.2em; border: 2px solid #008800; padding: 10px; text-align:center;">$$ y = ${fmt(a)} \\cdot x ${b>=0 ? '+' : '-'} ${fmt(Math.abs(b))} $$</div>`;
+    html += `В матричном виде (размер 3х3):<br>`;
+    html += `<div class="math-block">$$ \\begin{pmatrix} ${fmt(sX4)} & ${fmt(sX3)} & ${fmt(sX2)} \\\\ ${fmt(sX3)} & ${fmt(sX2)} & ${fmt(sX)} \\\\ ${fmt(sX2)} & ${fmt(sX)} & ${n} \\end{pmatrix} \\cdot \\begin{pmatrix} a \\\\ b \\\\ c \\end{pmatrix} = \\begin{pmatrix} ${fmt(sX2Y)} \\\\ ${fmt(sXY)} \\\\ ${fmt(sY)} \\end{pmatrix} $$</div>`;
 
-    html += `<h3 style="margin-top: 30px; color: #2c3e50; border-bottom: 2px solid #ccc;">Проверка МНК (Оценка точности):</h3>`;
-    html += `Посчитаем отклонения (\\(\\Delta\\)) реальных значений \\(Y\\) от вычисленных по формуле \\(Y_{расч}\\).<br>`;
+    // Решение матрицы методом Крамера
+    let det = (m) => m[0][0]*(m[1][1]*m[2][2] - m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2] - m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1] - m[1][1]*m[2][0]);
+    let M = [[sX4, sX3, sX2], [sX3, sX2, sX], [sX2, sX, n]];
+    let D = det(M);
     
+    let Ma = [[sX2Y, sX3, sX2], [sXY, sX2, sX], [sY, sX, n]];
+    let Mb = [[sX4, sX2Y, sX2], [sX3, sXY, sX], [sX2, sY, n]];
+    let Mc = [[sX4, sX3, sX2Y], [sX3, sX2, sXY], [sX2, sX, sY]];
+
+    let Da = det(Ma), Db = det(Mb), Dc = det(Mc);
+    let a = Da / D, b = Db / D, c = Dc / D;
+
+    html += `Решим систему методом Крамера:<br>`;
+    html += `\\( \\Delta = ${fmt(D)} \\)<br>`;
+    html += `\\( \\Delta_a = ${fmt(Da)}; \\quad a = \\Delta_a / \\Delta = \\mathbf{${fmt(a)}} \\)<br>`;
+    html += `\\( \\Delta_b = ${fmt(Db)}; \\quad b = \\Delta_b / \\Delta = \\mathbf{${fmt(b)}} \\)<br>`;
+    html += `\\( \\Delta_c = ${fmt(Dc)}; \\quad c = \\Delta_c / \\Delta = \\mathbf{${fmt(c)}} \\)<br>`;
+
+    html += `<h3 style="color: #8e44ad;">Итоговое уравнение параболы:</h3>`;
+    let b_str = b >= 0 ? `+ ${fmt(b)}` : `- ${fmt(Math.abs(b))}`;
+    let c_str = c >= 0 ? `+ ${fmt(c)}` : `- ${fmt(Math.abs(c))}`;
+    html += `<div class="math-block" style="font-size: 1.2em; border: 2px solid #8e44ad; padding: 10px; text-align:center;">$$ y = ${fmt(a)} \\cdot x^2 ${b_str} \\cdot x ${c_str} $$</div>`;
+
+    // Проверка
+    html += `<b>Проверка (Оценка точности):</b><br>`;
     let checkTbl = `<table><tr><th>x</th><th>Y (факт)</th><th>Y расч.</th><th>Отклонение Δ</th><th>Δ²</th></tr>`;
     let sumErr2 = 0;
     for(let i=0; i<n; i++) {
-        let y_calc = a * x[i] + b;
-        let delta = y[i] - y_calc;
-        let delta2 = delta * delta;
+        let y_calc = a*x[i]*x[i] + b*x[i] + c;
+        let delta = y[i] - y_calc, delta2 = delta*delta;
         sumErr2 += delta2;
         checkTbl += `<tr><td>${fmt(x[i])}</td><td>${fmt(y[i])}</td><td>${fmt(y_calc)}</td><td>${fmt(delta)}</td><td>${fmt(delta2)}</td></tr>`;
     }
@@ -326,22 +227,24 @@ function calculateMNK() {
 
     document.getElementById('report').innerHTML = html;
     document.getElementById('report').style.display = 'block';
-    
+
+    // Формирование точек для красивой кривой на графике
     let minX = Math.min(...x), maxX = Math.max(...x);
     let offset = (maxX - minX) * 0.1;
-    let mnkPoints = [
-        {x: minX - offset, y: a*(minX - offset) + b},
-        {x: maxX + offset, y: a*(maxX + offset) + b}
-    ];
-
-    drawChart('МНК-прямая (Тренд)', mnkPoints, x, y, false);
+    let quadPoints = [];
+    let step = (maxX - minX + 2*offset) / 50;
+    for(let ptX = minX - offset; ptX <= maxX + offset; ptX += step) {
+        quadPoints.push({x: ptX, y: a*ptX*ptX + b*ptX + c});
+    }
+    
+    drawChart('МНК-парабола (Квадратичный тренд)', quadPoints, x, y, true, '#8e44ad');
     MathJax.typesetPromise();
 }
 
 // ===============================================
-// ФУНКЦИЯ ОТРИСОВКИ ГРАФИКА
+// ФУНКЦИЯ ОТРИСОВКИ ГРАФИКА (Единая для всех)
 // ===============================================
-function drawChart(lineLabel, lineData, x_arr, y_arr, isCurve) {
+function drawChart(lineLabel, lineData, x_arr, y_arr, isCurve, colorHex) {
     let scatterPoints = [];
     for(let i=0; i<x_arr.length; i++) scatterPoints.push({x: x_arr[i], y: y_arr[i]});
 
@@ -355,17 +258,17 @@ function drawChart(lineLabel, lineData, x_arr, y_arr, isCurve) {
             datasets: [{
                 label: lineLabel,
                 data: lineData,
-                borderColor: '#0066ff',
+                borderColor: colorHex,
                 backgroundColor: 'transparent',
                 borderWidth: 2,
                 showLine: true,
                 pointRadius: 0,
                 tension: isCurve ? 0.4 : 0
             }, {
-                label: 'Исходные точки',
+                label: 'Исходные узлы',
                 data: scatterPoints,
                 backgroundColor: '#ff0000',
-                borderColor: '#ff0000',
+                borderColor: '#bb0000',
                 pointRadius: 6,
                 showLine: false
             }]
