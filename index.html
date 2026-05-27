@@ -62,14 +62,14 @@
 </div>
 
 <script>
-// Вспомогательные функции
+// Вспомогательные функции форматирования
 function fmt(num) { return (Math.round(num * 1000) / 1000).toString().replace('.', ','); }
 function wrapNeg(num) { return num < 0 ? `(${fmt(num)})` : fmt(num); }
 
 let chartInstance = null;
 
 // ===============================================
-// 1. КУБИЧЕСКИЙ СПЛАЙН
+// 1. КУБИЧЕСКИЙ СПЛАЙН (С ПОЛНЫМ ВЫВОДОМ И ПРОВЕРКАМИ)
 // ===============================================
 function calculateSpline() {
     let xStr = document.getElementById('x_vals').value.trim().split(/\s+/);
@@ -171,7 +171,7 @@ function calculateSpline() {
     }
     html += `\\end{aligned} $$</div>`;
 
-    // ПРОВЕРКИ
+    // ПРОВЕРКИ СПЛАЙНА
     html += `<h3 style="margin-top: 40px; color: #2c3e50; border-bottom: 2px solid #ccc;">Проверка совпадений требований:</h3>`;
     
     html += `<b>1) Требуем совпадения в узлах значений функции и значений сплайна:</b>`;
@@ -181,7 +181,6 @@ function calculateSpline() {
         let h_calc = h[i];
         let val1 = a[i]; 
         let val2 = a[i] + b[i]*h_calc + C_arr[i-1]*h_calc*h_calc + d[i]*h_calc*h_calc*h_calc;
-        
         let a_str = `${fmt(a[i])}`;
         let b_str = b[i] >= 0 ? `+ ${fmt(b[i])}` : `- ${fmt(Math.abs(b[i]))}`;
         let c_str = C_arr[i-1] >= 0 ? `+ ${fmt(C_arr[i-1])}` : `- ${fmt(Math.abs(C_arr[i-1]))}`;
@@ -199,25 +198,20 @@ function calculateSpline() {
     for(let i=1; i<=n; i++) {
         checkTable += `<tr><td><b>S_${i}</b></td>`;
         for(let j=0; j<=n; j++) {
-            if (j === i-1) {
-                checkTable += `<td>${fmt(a[i])}</td>`;
-            } else if (j === i) {
+            if (j === i-1) { checkTable += `<td>${fmt(a[i])}</td>`; } 
+            else if (j === i) {
                 let diff = h[i];
                 let val2 = a[i] + b[i]*diff + C_arr[i-1]*diff*diff + d[i]*diff*diff*diff;
                 checkTable += `<td>${fmt(val2)}</td>`;
-            } else {
-                checkTable += `<td></td>`;
-            }
+            } else { checkTable += `<td></td>`; }
         }
         checkTable += `</tr>`;
     }
     checkTable += `</table>`;
     html += checkTable;
 
-    html += `<b>2) Требуем непрерывности функции первой и второй производной во всех внутренних точках, включая узловые:</b>`;
-    html += `<div class="math-block">$$ \\begin{aligned} S'_i(x_i -) &= S'_{i+1}(x_i +) \\\\ S''_i(x_i -) &= S''_{i+1}(x_i +) \\\\ i &= 1, n-1 \\end{aligned} $$</div>`;
-    
-    html += `<div class="math-block">$$ \\begin{aligned} S'_i(x) &= b_i + 2 \\cdot c_i \\cdot (x - x_{i-1}) + 3 \\cdot d_i \\cdot (x - x_{i-1})^2 \\\\ S''_i(x) &= 2 \\cdot c_i + 6 \\cdot d_i \\cdot (x - x_{i-1}) \\\\ S'_{i+1}(x) &= b_{i+1} + 2 \\cdot c_{i+1} \\cdot (x - x_i) + 3 \\cdot d_{i+1} \\cdot (x - x_i)^2 \\\\ S''_{i+1}(x) &= 2 \\cdot c_{i+1} + 6 \\cdot d_{i+1} \\cdot (x - x_i) \\end{aligned} $$</div>`;
+    html += `<b>2) Требуем непрерывности первой и второй производной во всех внутренних точках, включая узловые:</b>`;
+    html += `<div class="math-block">$$ \\begin{aligned} S'_i(x_i -) &= S'_{i+1}(x_i +) \\\\ S''_i(x_i -) &= S''_{i+1}(x_i +) \\end{aligned} $$</div>`;
     
     html += `<div class="math-block">$$ \\begin{aligned} S'_i(x_i -) &= b_i + 2 \\cdot c_i \\cdot h_i + 3 \\cdot d_i \\cdot h_i^2 \\\\ S''_i(x_i -) &= 2 \\cdot c_i + 6 \\cdot d_i \\cdot h_i \\\\ S'_{i+1}(x_i +) &= b_{i+1} \\\\ S''_{i+1}(x_i +) &= 2 \\cdot c_{i+1} \\end{aligned} $$</div>`;
 
@@ -225,26 +219,19 @@ function calculateSpline() {
         for(let i=1; i<n; i++) {
             let left_d1 = b[i] + 2*C_arr[i-1]*h[i] + 3*d[i]*h[i]*h[i];
             let left_d2 = 2*C_arr[i-1] + 6*d[i]*h[i];
-            let right_d1 = b[i+1];
-            let right_d2 = 2*C_arr[i];
-
+            
             html += `<b>Для узла \\(\\; x_${i} = ${fmt(x[i])} \\):</b><br>`;
             html += `\\( S'_{${i}}(${wrapNeg(x[i])} -) = ${fmt(b[i])} + 2 \\cdot ${wrapNeg(C_arr[i-1])} \\cdot ${fmt(h[i])} + 3 \\cdot ${wrapNeg(d[i])} \\cdot ${fmt(h[i])}^2 = \\mathbf{${fmt(left_d1)}} \\)<br>`;
-            html += `\\( S'_{${i+1}}(${wrapNeg(x[i])} +) = \\mathbf{${fmt(right_d1)}} \\)<br>`;
+            html += `\\( S'_{${i+1}}(${wrapNeg(x[i])} +) = \\mathbf{${fmt(b[i+1])}} \\)<br>`;
             html += `\\( S''_{${i}}(${wrapNeg(x[i])} -) = 2 \\cdot ${wrapNeg(C_arr[i-1])} + 6 \\cdot ${wrapNeg(d[i])} \\cdot ${fmt(h[i])} = \\mathbf{${fmt(left_d2)}} \\)<br>`;
-            html += `\\( S''_{${i+1}}(${wrapNeg(x[i])} +) = 2 \\cdot ${wrapNeg(C_arr[i])} = \\mathbf{${fmt(right_d2)}} \\)<br><br>`;
+            html += `\\( S''_{${i+1}}(${wrapNeg(x[i])} +) = 2 \\cdot ${wrapNeg(C_arr[i])} = \\mathbf{${fmt(2*C_arr[i])}} \\)<br><br>`;
         }
     }
 
-    html += `<b>3) Требуем равенства второй производной нулю в местах нулевой кривизны:</b>`;
-    html += `<div class="math-block">$$ \\begin{aligned} S''(x_0 +) &= 0 \\\\ S''(x_n -) &= 0 \\end{aligned} $$</div>`;
-
-    let left_edge_d2 = 2 * C_arr[0];
-    let right_edge_d2 = 2 * C_arr[n-1] + 6 * d[n] * h[n];
-    
-    html += `На левом краю (\\( x_0 = ${fmt(x[0])} \\)):<br>`;
+    html += `<b>3) Требуем равенства второй производной нулю на краях (в местах нулевой кривизны):</b>`;
+    let left_edge_d2 = 2 * C_arr[0], right_edge_d2 = 2 * C_arr[n-1] + 6 * d[n] * h[n];
+    html += `<br>На левом краю (\\( x_0 = ${fmt(x[0])} \\)):<br>`;
     html += `\\( S''_{1}(x_0 +) = 2 \\cdot c_1 = 2 \\cdot ${wrapNeg(C_arr[0])} = \\mathbf{${fmt(Math.abs(left_edge_d2) < 0.0001 ? 0 : left_edge_d2)}} \\)<br><br>`;
-    
     html += `На правом краю (\\( x_n = ${fmt(x[n])} \\)):<br>`;
     html += `\\( S''_{${n}}(x_n -) = 2 \\cdot c_{${n}} + 6 \\cdot d_{${n}} \\cdot h_{${n}} = 2 \\cdot ${wrapNeg(C_arr[n-1])} + 6 \\cdot ${wrapNeg(d[n])} \\cdot ${fmt(h[n])} = \\mathbf{${fmt(Math.abs(right_edge_d2) < 0.0001 ? 0 : right_edge_d2)}} \\)<br>`;
 
@@ -260,12 +247,12 @@ function calculateSpline() {
             splinePoints.push({x: cx, y: cy});
         }
     }
-    drawChart('Сплайн (S(x))', splinePoints, x, y, true);
+    drawChart('Кубический сплайн', splinePoints, x, y, true, '#008800');
     MathJax.typesetPromise();
 }
 
 // ===============================================
-// ЛОГИКА 2: ЛИНЕЙНЫЙ МНК
+// 2. ЛИНЕЙНЫЙ МНК (С ПОЛНЫМ ВЫВОДОМ)
 // ===============================================
 function calculateMNK() {
     let xStr = document.getElementById('x_vals').value.trim().split(/\s+/);
@@ -278,17 +265,14 @@ function calculateMNK() {
 
     let sumX = 0, sumY = 0, sumX2 = 0, sumXY = 0;
     for(let i=0; i<n; i++) {
-        sumX += x[i];
-        sumY += y[i];
-        sumX2 += x[i]*x[i];
-        sumXY += x[i]*y[i];
+        sumX += x[i]; sumY += y[i]; sumX2 += x[i]*x[i]; sumXY += x[i]*y[i];
     }
 
     let D = n * sumX2 - sumX * sumX;
     let a = (n * sumXY - sumX * sumY) / D;
     let b = (sumY * sumX2 - sumX * sumXY) / D;
 
-    let html = `<h3>Линейная аппроксимация (МНК):</h3>`;
+    let html = `<h3 style="color: #2c3e50; border-color: #2c3e50;">Линейная аппроксимация (МНК):</h3>`;
     html += `Ищем уравнение прямой вида: <div class="math-block">$$ y = a \\cdot x + b $$</div>`;
     
     html += `<b>1. Составляем расчетную таблицу:</b>`;
@@ -308,12 +292,10 @@ function calculateMNK() {
     html += `Решая систему линейных уравнений, получаем:<br>`;
     html += `<div class="math-block">$$ a = ${fmt(a)}; \\quad b = ${fmt(b)} $$</div>`;
     
-    html += `<h3 style="color: #2c3e50;">Итоговое уравнение прямой:</h3>`;
-    html += `<div class="math-block" style="font-size: 1.2em; border: 2px solid #008800; padding: 10px; text-align:center;">$$ y = ${fmt(a)} \\cdot x ${b>=0 ? '+' : '-'} ${fmt(Math.abs(b))} $$</div>`;
+    html += `<h3 style="color: #2c3e50; border-color: #2c3e50;">Итоговое уравнение прямой:</h3>`;
+    html += `<div class="math-block" style="font-size: 1.2em; border: 2px solid #2c3e50; padding: 10px; text-align:center;">$$ y = ${fmt(a)} \\cdot x ${b>=0 ? '+' : '-'} ${fmt(Math.abs(b))} $$</div>`;
 
     html += `<h3 style="margin-top: 30px; color: #2c3e50; border-bottom: 2px solid #ccc;">Проверка МНК (Оценка точности):</h3>`;
-    html += `Посчитаем отклонения (\\(\\Delta\\)) реальных значений \\(Y\\) от вычисленных по формуле \\(Y_{расч}\\).<br>`;
-    
     let checkTbl = `<table><tr><th>x</th><th>Y (факт)</th><th>Y расч.</th><th>Отклонение Δ</th><th>Δ²</th></tr>`;
     let sumErr2 = 0;
     for(let i=0; i<n; i++) {
@@ -336,18 +318,17 @@ function calculateMNK() {
         {x: maxX + offset, y: a*(maxX + offset) + b}
     ];
 
-    drawChart('МНК-прямая (Тренд)', mnkPoints, x, y, false);
+    drawChart('МНК-прямая (Линейный тренд)', mnkPoints, x, y, false, '#2c3e50');
     MathJax.typesetPromise();
 }
+
 // ===============================================
-// 3. КВАДРАТИЧНЫЙ МНК (ПАРАБОЛА) - НОВОЕ!
+// 3. КВАДРАТИЧНЫЙ МНК (С ПОДРОБНЫМ ВЫВОДОМ КРАМЕРА)
 // ===============================================
 function calculateQuadMNK() {
     let xStr = document.getElementById('x_vals').value.trim().split(/\s+/);
     let yStr = document.getElementById('y_vals').value.trim().split(/\s+/);
-    let x = xStr.map(Number);
-    let y = yStr.map(Number);
-    let n = x.length;
+    let x = xStr.map(Number), y = yStr.map(Number), n = x.length;
 
     if (x.length !== y.length || n < 3) { alert("Ошибка: для квадратичного МНК нужно минимум 3 точки!"); return; }
 
@@ -373,34 +354,49 @@ function calculateQuadMNK() {
     html += `Подставим суммы из нашей таблицы:<br>`;
     html += `<div class="math-block">$$ \\begin{cases} ${fmt(sX4)}a + ${fmt(sX3)}b + ${fmt(sX2)}c = ${fmt(sX2Y)} \\\\ ${fmt(sX3)}a + ${fmt(sX2)}b + ${fmt(sX)}c = ${fmt(sXY)} \\\\ ${fmt(sX2)}a + ${fmt(sX)}b + ${n}c = ${fmt(sY)} \\end{cases} $$</div>`;
     
-    html += `В матричном виде (размер 3х3):<br>`;
-    html += `<div class="math-block">$$ \\begin{pmatrix} ${fmt(sX4)} & ${fmt(sX3)} & ${fmt(sX2)} \\\\ ${fmt(sX3)} & ${fmt(sX2)} & ${fmt(sX)} \\\\ ${fmt(sX2)} & ${fmt(sX)} & ${n} \\end{pmatrix} \\cdot \\begin{pmatrix} a \\\\ b \\\\ c \\end{pmatrix} = \\begin{pmatrix} ${fmt(sX2Y)} \\\\ ${fmt(sXY)} \\\\ ${fmt(sY)} \\end{pmatrix} $$</div>`;
+    html += `В матричном виде: <div class="math-block">$$ \\begin{pmatrix} ${fmt(sX4)} & ${fmt(sX3)} & ${fmt(sX2)} \\\\ ${fmt(sX3)} & ${fmt(sX2)} & ${fmt(sX)} \\\\ ${fmt(sX2)} & ${fmt(sX)} & ${n} \\end{pmatrix} \\cdot \\begin{pmatrix} a \\\\ b \\\\ c \\end{pmatrix} = \\begin{pmatrix} ${fmt(sX2Y)} \\\\ ${fmt(sXY)} \\\\ ${fmt(sY)} \\end{pmatrix} $$</div>`;
 
-    // Решение матрицы методом Крамера
-    let det = (m) => m[0][0]*(m[1][1]*m[2][2] - m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2] - m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1] - m[1][1]*m[2][0]);
+    // Функция формата подробного вывода определителя 3х3
+    function formatDet(m, nameStr) {
+        let det = m[0][0]*(m[1][1]*m[2][2] - m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2] - m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1] - m[1][1]*m[2][0]);
+        let str = `<div class="math-block">$$ \\begin{aligned} ${nameStr} &= ${fmt(m[0][0])} \\cdot (${wrapNeg(m[1][1])} \\cdot ${wrapNeg(m[2][2])} - ${wrapNeg(m[1][2])} \\cdot ${wrapNeg(m[2][1])}) \\\\ `;
+        str += `&\\quad - ${wrapNeg(m[0][1])} \\cdot (${wrapNeg(m[1][0])} \\cdot ${wrapNeg(m[2][2])} - ${wrapNeg(m[1][2])} \\cdot ${wrapNeg(m[2][0])}) \\\\ `;
+        str += `&\\quad + ${wrapNeg(m[0][2])} \\cdot (${wrapNeg(m[1][0])} \\cdot ${wrapNeg(m[2][1])} - ${wrapNeg(m[1][1])} \\cdot ${wrapNeg(m[2][0])}) \\\\ `;
+        str += `&= \\mathbf{${fmt(det)}} \\end{aligned} $$</div>`;
+        return {str: str, val: det};
+    }
+
     let M = [[sX4, sX3, sX2], [sX3, sX2, sX], [sX2, sX, n]];
-    let D = det(M);
-    
     let Ma = [[sX2Y, sX3, sX2], [sXY, sX2, sX], [sY, sX, n]];
     let Mb = [[sX4, sX2Y, sX2], [sX3, sXY, sX], [sX2, sY, n]];
     let Mc = [[sX4, sX3, sX2Y], [sX3, sX2, sXY], [sX2, sX, sY]];
 
-    let Da = det(Ma), Db = det(Mb), Dc = det(Mc);
-    let a = Da / D, b = Db / D, c = Dc / D;
+    html += `<b>3. Решим систему методом Крамера (через определители):</b><br>`;
+    
+    let resD = formatDet(M, '\\Delta');
+    html += `Главный определитель \\( \\Delta \\): ${resD.str}`;
+    
+    let resDa = formatDet(Ma, '\\Delta_a');
+    html += `Определитель \\( \\Delta_a \\): ${resDa.str}`;
+    
+    let resDb = formatDet(Mb, '\\Delta_b');
+    html += `Определитель \\( \\Delta_b \\): ${resDb.str}`;
+    
+    let resDc = formatDet(Mc, '\\Delta_c');
+    html += `Определитель \\( \\Delta_c \\): ${resDc.str}`;
 
-    html += `Решим систему методом Крамера:<br>`;
-    html += `\\( \\Delta = ${fmt(D)} \\)<br>`;
-    html += `\\( \\Delta_a = ${fmt(Da)}; \\quad a = \\Delta_a / \\Delta = \\mathbf{${fmt(a)}} \\)<br>`;
-    html += `\\( \\Delta_b = ${fmt(Db)}; \\quad b = \\Delta_b / \\Delta = \\mathbf{${fmt(b)}} \\)<br>`;
-    html += `\\( \\Delta_c = ${fmt(Dc)}; \\quad c = \\Delta_c / \\Delta = \\mathbf{${fmt(c)}} \\)<br>`;
+    let a = resDa.val / resD.val, b = resDb.val / resD.val, c = resDc.val / resD.val;
 
-    html += `<h3 style="color: #8e44ad;">Итоговое уравнение параболы:</h3>`;
+    html += `Находим коэффициенты a, b, c:<br>`;
+    html += `<div class="math-block">$$ \\begin{aligned} a &= \\frac{\\Delta_a}{\\Delta} = \\frac{${fmt(resDa.val)}}{${fmt(resD.val)}} = \\mathbf{${fmt(a)}} \\\\ b &= \\frac{\\Delta_b}{\\Delta} = \\frac{${fmt(resDb.val)}}{${fmt(resD.val)}} = \\mathbf{${fmt(b)}} \\\\ c &= \\frac{\\Delta_c}{\\Delta} = \\frac{${fmt(resDc.val)}}{${fmt(resD.val)}} = \\mathbf{${fmt(c)}} \\end{aligned} $$</div>`;
+
+    html += `<h3 style="color: #8e44ad; border-color: #8e44ad;">Итоговое уравнение параболы:</h3>`;
     let b_str = b >= 0 ? `+ ${fmt(b)}` : `- ${fmt(Math.abs(b))}`;
     let c_str = c >= 0 ? `+ ${fmt(c)}` : `- ${fmt(Math.abs(c))}`;
     html += `<div class="math-block" style="font-size: 1.2em; border: 2px solid #8e44ad; padding: 10px; text-align:center;">$$ y = ${fmt(a)} \\cdot x^2 ${b_str} \\cdot x ${c_str} $$</div>`;
 
     // Проверка
-    html += `<b>Проверка (Оценка точности):</b><br>`;
+    html += `<h3 style="margin-top: 30px; color: #2c3e50; border-bottom: 2px solid #ccc;">Проверка (Оценка точности):</h3>`;
     let checkTbl = `<table><tr><th>x</th><th>Y (факт)</th><th>Y расч.</th><th>Отклонение Δ</th><th>Δ²</th></tr>`;
     let sumErr2 = 0;
     for(let i=0; i<n; i++) {
@@ -415,7 +411,6 @@ function calculateQuadMNK() {
     document.getElementById('report').innerHTML = html;
     document.getElementById('report').style.display = 'block';
 
-    // Формирование точек для красивой кривой на графике
     let minX = Math.min(...x), maxX = Math.max(...x);
     let offset = (maxX - minX) * 0.1;
     let quadPoints = [];
@@ -429,7 +424,7 @@ function calculateQuadMNK() {
 }
 
 // ===============================================
-// ФУНКЦИЯ ОТРИСОВКИ ГРАФИКА (Единая для всех)
+// ФУНКЦИЯ ОТРИСОВКИ ГРАФИКА
 // ===============================================
 function drawChart(lineLabel, lineData, x_arr, y_arr, isCurve, colorHex) {
     let scatterPoints = [];
